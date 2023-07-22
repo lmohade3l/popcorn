@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import StarRating from "./StarRating";
+import { useMovies } from "./useMovies";
+import { useLocalStorageState } from "./useLocalStorageState";
 
 // const tempMovieData = [
 //   {
@@ -51,15 +53,22 @@ import StarRating from "./StarRating";
 const average = (arr) =>
   arr.reduce((acc, cur, i, arr) => acc + cur / arr.length, 0);
 
-const KEY = 'ceb66389';
+  const KEY = 'ceb66389';
 
 export default function App() {
-  const [movies, setMovies] = useState([]);
-  const [watched, setWatched] = useState([]);
-  const [is_loading , set_is_loading] = useState(false);
-  const [error , set_error] = useState('');
   const [query, setQuery] = useState("");
   const [selected_id , set_selected_id] = useState(''); 
+
+  const {movies , is_loading , error } =  useMovies(query , close_movie);
+
+  const [watched, setWatched] = useLocalStorageState([] , 'watched');
+
+  // const [watched, setWatched] = useState([]);
+  // const [watched, setWatched] = useState(function() {
+  //   const stored_value = localStorage.getItem('watched');
+  //   return JSON.parse(stored_value);
+  // });
+  
 
   /*
   useEffect(function () {
@@ -86,7 +95,10 @@ export default function App() {
   }
 
   function handle_add_watched(movie) {
+    //this update happens in an asynchronous way
     setWatched(watched => [...watched , movie]);
+    //Store in locale storage. Due to the update way we shouldn't pass the watched array:
+    // localStorage.setItem('watched' ,JSON.stringify([...watched , movie]));
   }
 
   function handle_delete(id){
@@ -94,49 +106,12 @@ export default function App() {
 
   }
 
+  useEffect(function() {
+    localStorage.setItem('watched' ,JSON.stringify(watched));
+  } , [watched]);
+
+
   
-
-  useEffect(function () {
-    const controller = new AbortController();
-
-    async function fetch_movies() {
-      try {
-        set_is_loading(true);
-        //FIXME what?
-        set_error('');
-        const res = await fetch(`http://www.omdbapi.com/?apikey=${KEY}&s=${query}` , {signal: controller.signal});
-
-        if(!res.ok) throw new Error("Something went wrong!");
-
-        const data = await res.json();
-        
-        if(data.Response === 'False') throw new Error('Movie not found!');
-        
-        setMovies(data.Search);
-        set_error('');
-
-      } catch(err) {
-        console.error(err.message);
-
-        if(err.name !== 'AbortError') set_error(err.message);
-        
-      } finally {
-        set_is_loading(false);
-      }
-    }
-    if(query.length < 3) {
-      setMovies([]);
-      set_error('');
-      return
-    }
-    close_movie();
-    fetch_movies();
-
-    //Clean up
-    return function() {
-      controller.abort();
-    }
-  } , [query]);
 
   return (
     <>
@@ -185,7 +160,14 @@ function Loader() {
 }
 
 function Search({query, setQuery}) {
-  
+
+  //by refreshing focus on search input
+  const input_element = useRef(null);
+
+  useEffect(function() {
+    input_element.current.focus();
+  } , [])
+
   return (
     <input
       className="search"
@@ -193,6 +175,7 @@ function Search({query, setQuery}) {
       placeholder="Search movies..."
       value={query}
       onChange={(e) => setQuery(e.target.value)}
+      ref={input_element}
     />
   )
 }
